@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎲 Emoji Race</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { display: ['Outfit', 'sans-serif'], body: ['Inter', 'sans-serif'] } } }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&display=swap"
+    rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: flex;
+      animation: fadeIn .4s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    .glass {
+      background: rgba(255, 255, 255, .05);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, .08);
+    }
+
+    .floating-emoji {
+      position: absolute;
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+      opacity: .12;
+      animation: floatE var(--dur, 7s) ease-in-out var(--d, 0s) infinite;
+    }
+
+    @keyframes floatE {
+
+      0%,
+      100% {
+        transform: translateY(0) rotate(0)
+      }
+
+      50% {
+        transform: translateY(-25px) rotate(8deg)
+      }
+    }
+
+    .btn-glow {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-glow::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      background: linear-gradient(45deg, #06b6d4, #a855f7, #ec4899, #06b6d4);
+      background-size: 400% 400%;
+      animation: glow 3s ease infinite;
+      border-radius: inherit;
+      z-index: -1;
+      filter: blur(8px);
+      opacity: .6;
+    }
+
+    @keyframes glow {
+
+      0%,
+      100% {
+        background-position: 0% 50%
+      }
+
+      50% {
+        background-position: 100% 50%
+      }
+    }
+
+    .tile {
+      aspect-ratio: 1;
+      border-radius: 10px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: transform .15s, box-shadow .15s;
+      cursor: default;
+      overflow: hidden;
+    }
+
+    .tile::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(135deg, rgba(255, 255, 255, .15) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .tile-active {
+      transform: scale(1.12);
+      z-index: 5;
+      box-shadow: 0 0 20px rgba(255, 255, 255, .3);
+    }
+
+    .special-tile {
+      animation: specialPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes specialPulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0)
+      }
+
+      50% {
+        box-shadow: 0 0 12px 3px rgba(255, 255, 255, .25)
+      }
+    }
+
+    .tile-tokens {
+      position: absolute;
+      bottom: 1px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 1px;
+      z-index: 10;
+    }
+
+    .token {
+      font-size: clamp(.85rem, 2.5vw, 1.3rem);
+      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .7));
+      animation: tokenBounce .4s ease;
+    }
+
+    @keyframes tokenBounce {
+      0% {
+        transform: scale(0)
+      }
+
+      60% {
+        transform: scale(1.3)
+      }
+
+      100% {
+        transform: scale(1)
+      }
+    }
+
+    .dice-spin {
+      animation: diceSpin .1s linear infinite;
+    }
+
+    @keyframes diceSpin {
+      from {
+        transform: rotate(0)
+      }
+
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    .dice-result {
+      animation: diceReveal .4s cubic-bezier(.34, 1.56, .64, 1);
+    }
+
+    @keyframes diceReveal {
+      0% {
+        transform: scale(.3)
+      }
+
+      100% {
+        transform: scale(1)
+      }
+    }
+
+    .log-entry {
+      animation: slideUp .25s ease-out;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(8px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    .confetti-piece {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      top: -20px;
+      z-index: 100;
+      animation: confFall var(--fd, 3s) linear var(--dd, 0s) forwards;
+    }
+
+    @keyframes confFall {
+      0% {
+        transform: translateY(0) rotate(0);
+        opacity: 1
+      }
+
+      80% {
+        opacity: 1
+      }
+
+      100% {
+        transform: translateY(100vh) rotate(var(--r, 720deg));
+        opacity: 0
+      }
+    }
+
+    .special-popup {
+      animation: popUp .5s cubic-bezier(.34, 1.56, .64, 1);
+    }
+
+    @keyframes popUp {
+      0% {
+        transform: scale(0) translateY(20px);
+        opacity: 0
+      }
+
+      100% {
+        transform: scale(1) translateY(0);
+        opacity: 1
+      }
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, .1);
+      border-radius: 2px
+    }
+
+    .turn-active {
+      border: 2px solid #fbbf24;
+      box-shadow: 0 0 15px rgba(251, 191, 36, .2);
+    }
+  </style>
+</head>
+
+<body class="text-white font-body min-h-screen overflow-x-hidden">
+
+  <!-- ========== TITLE SCREEN ========== -->
+  <div id="title-screen"
+    class="screen active flex-col items-center justify-center min-h-screen relative overflow-hidden px-4">
+    <div class="absolute inset-0 pointer-events-none overflow-hidden">
+      <span class="floating-emoji" style="left:5%;top:12%;--dur:6s;--d:0s">🎲</span>
+      <span class="floating-emoji" style="left:80%;top:8%;--dur:8s;--d:1s">🎈</span>
+      <span class="floating-emoji" style="left:20%;top:65%;--dur:7s;--d:.5s">🍕</span>
+      <span class="floating-emoji" style="left:70%;top:60%;--dur:9s;--d:2s">🦄</span>
+      <span class="floating-emoji" style="left:40%;top:78%;--dur:6s;--d:1.5s">🌈</span>
+      <span class="floating-emoji" style="left:88%;top:38%;--dur:8s;--d:.8s">⚡</span>
+      <span class="floating-emoji" style="left:12%;top:40%;--dur:7s;--d:2.5s">🍀</span>
+      <span class="floating-emoji" style="left:55%;top:20%;--dur:9s;--d:3s">🏆</span>
+      <span class="floating-emoji" style="left:35%;top:45%;--dur:6.5s;--d:.3s">🎪</span>
+    </div>
+    <div class="relative z-10 text-center">
+      <div class="text-7xl md:text-8xl mb-4 animate-bounce">🎲</div>
+      <h1
+        class="font-display text-5xl md:text-7xl font-black bg-gradient-to-r from-yellow-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+        EMOJI RACE</h1>
+      <div class="flex items-center justify-center gap-3 mb-6">
+        <span class="h-px w-10 bg-gradient-to-r from-transparent to-pink-500/50"></span>
+        <span class="text-pink-400/70 text-sm font-semibold tracking-widest">BOARD GAME</span>
+        <span class="h-px w-10 bg-gradient-to-l from-transparent to-pink-500/50"></span>
+      </div>
+      <p class="text-white/40 text-base max-w-sm mx-auto mb-10 leading-relaxed">
+        Roll the dice, race to tile 30!<br>Watch out for traps and grab those boosts! 🏁
+      </p>
+      <button onclick="startGame()"
+        class="btn-glow bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-display font-bold text-lg px-10 py-4 rounded-2xl tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer">
+        🏁 START RACE
+      </button>
+      <div class="mt-5 flex justify-center gap-4 text-white/20 text-xs">
+        <span>⚡ Boost</span><span>🕳️ Trap</span><span>🔄 Swap</span><span>🍀 Lucky</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== GAME SCREEN ========== -->
+  <div id="game-screen" class="screen flex-col min-h-screen px-3 py-4 md:px-4">
+    <!-- Header -->
+    <div class="max-w-2xl mx-auto w-full mb-3 text-center">
+      <h1 class="font-display text-xl md:text-2xl font-bold">🎲 <span
+          class="bg-gradient-to-r from-yellow-400 to-pink-400 bg-clip-text text-transparent">Emoji Race</span> 🏁</h1>
+    </div>
+    <!-- Player Info -->
+    <div class="max-w-2xl mx-auto w-full grid grid-cols-2 gap-3 mb-3">
+      <div id="player-card" class="glass rounded-xl px-3 py-2 flex items-center gap-2 transition-all">
+        <span class="text-2xl">😎</span>
+        <div>
+          <p class="text-xs text-white/40">You</p>
+          <p class="font-display font-bold text-sm" id="player-pos-text">START</p>
+        </div>
+      </div>
+      <div id="computer-card" class="glass rounded-xl px-3 py-2 flex items-center gap-2 transition-all">
+        <span class="text-2xl">🤖</span>
+        <div>
+          <p class="text-xs text-white/40">Computer</p>
+          <p class="font-display font-bold text-sm" id="computer-pos-text">START</p>
+        </div>
+      </div>
+    </div>
+    <!-- Status -->
+    <div class="max-w-2xl mx-auto w-full mb-3 text-center">
+      <p id="status-text" class="text-white/60 text-sm font-semibold">Your turn! 🎲 Roll the dice!</p>
+    </div>
+    <!-- Board -->
+    <div class="max-w-2xl mx-auto w-full flex justify-center mb-3">
+      <div id="board" class="grid grid-cols-6 gap-1 w-full" style="max-width:420px"></div>
+    </div>
+    <!-- Dice + Controls -->
+    <div class="max-w-2xl mx-auto w-full flex flex-col items-center mb-3">
+      <div id="dice-display" class="text-5xl md:text-6xl mb-2 select-none">🎲</div>
+      <button id="roll-btn" onclick="handleRoll()"
+        class="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-display font-bold text-base px-8 py-3 rounded-xl tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100">
+        🎲 ROLL!
+      </button>
+    </div>
+    <!-- Game Log -->
+    <div class="max-w-2xl mx-auto w-full glass rounded-xl p-3" style="max-height:120px;overflow-y:auto">
+      <div id="game-log" class="space-y-1"></div>
+    </div>
+    <!-- Legend -->
+    <div class="max-w-2xl mx-auto w-full mt-2 flex justify-center gap-3 flex-wrap text-[10px] md:text-xs text-white/30">
+      <span>⚡ Boost +2</span><span>🕳️ Trap -3</span><span>🔄 Swap positions</span><span>🍀 Extra turn</span>
+    </div>
+  </div>
+
+  <!-- ========== WIN OVERLAY ========== -->
+  <div id="win-overlay"
+    class="hidden fixed inset-0 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center z-40 px-4">
+    <div id="confetti-box" class="fixed inset-0 pointer-events-none z-50"></div>
+    <div class="text-center special-popup relative z-50">
+      <div class="text-7xl md:text-8xl mb-4" id="win-emoji">🎉</div>
+      <h2 class="font-display text-4xl md:text-5xl font-black mb-2" id="win-title">YOU WIN!</h2>
+      <p class="text-white/50 text-lg mb-8" id="win-subtitle">You reached the finish first!</p>
+      <button onclick="restartGame()"
+        class="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-display font-bold text-lg px-10 py-4 rounded-2xl tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer">
+        🔄 PLAY AGAIN
+      </button>
+    </div>
+  </div>
+
+  <!-- ========== SPECIAL TILE POPUP ========== -->
+  <div id="special-popup" class="hidden fixed inset-0 flex items-center justify-center z-30 pointer-events-none">
+    <div class="special-popup text-center">
+      <div class="text-6xl mb-2" id="popup-emoji">⚡</div>
+      <p class="font-display font-bold text-2xl text-white" id="popup-text">BOOST!</p>
+      <p class="text-white/50 text-sm" id="popup-detail">+2 tiles forward!</p>
+    </div>
+  </div>
+
+  <script>
+    // ===== CONSTANTS =====
+    const TOTAL = 30, COLS = 6, ROWS = 5;
+    const DICE_EMOJIS = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+
+    const SPECIAL_TILES = {
+      5: { type: 'boost', emoji: '⚡', label: 'BOOST!', detail: '+2 tiles forward!' },
+      9: { type: 'trap', emoji: '🕳️', label: 'TRAP!', detail: '-3 tiles back!' },
+      12: { type: 'lucky', emoji: '🍀', label: 'LUCKY!', detail: 'Roll again!' },
+      16: { type: 'boost', emoji: '⚡', label: 'BOOST!', detail: '+2 tiles forward!' },
+      19: { type: 'trap', emoji: '🕳️', label: 'TRAP!', detail: '-3 tiles back!' },
+      22: { type: 'swap', emoji: '🔄', label: 'SWAP!', detail: 'Positions swapped!' },
+      24: { type: 'lucky', emoji: '🍀', label: 'LUCKY!', detail: 'Roll again!' },
+      26: { type: 'trap', emoji: '🕳️', label: 'TRAP!', detail: '-3 tiles back!' },
+      28: { type: 'boost', emoji: '⚡', label: 'BOOST!', detail: '+2 tiles forward!' },
+    };
+
+    const TILE_COLORS = [
+      '#FF6B6B', '#FF8E53', '#FECA57', '#48DBFB', '#6BCB77', '#9B59B6',
+      '#FF6B9D', '#00D2D3', '#FF9F43', '#54A0FF', '#5F27CD', '#01A3A4',
+      '#F368E0', '#FF6348', '#2ED573', '#1E90FF', '#FFA502', '#7BED9F',
+      '#70A1FF', '#FF4757', '#ECCC68', '#FF6B81', '#7158E2', '#3AE374',
+      '#FF3838', '#A55EEA', '#FC427B', '#F8B739', '#20BF6B', '#FFD700',
+    ];
+
+    const DECO = ['🏁', '🌟', '🎈', '🍕', '🌈', '🎪', '🦄', '🍩', '🎵', '🌺',
+      '🎨', '🧸', '🍭', '🎯', '🎸', '🌻', '🎃', '🍉', '🦋', '🌮',
+      '🎠', '🍦', '🎪', '🌸', '🐝', '🎭', '🌊', '🍿', '🎶', '🏆'];
+
+    // ===== STATE =====
+    let state = { playerPos: 0, computerPos: 0, isAnimating: false, gameOver: false };
+
+    // ===== UTILITIES =====
+    const delay = ms => new Promise(r => setTimeout(r, ms));
+    const rollDice = () => Math.floor(Math.random() * 6) + 1;
+
+    function getTileNumber(row, col) {
+      const tileRow = ROWS - row;
+      const start = (tileRow - 1) * COLS + 1;
+      return tileRow % 2 === 1 ? start + col : start + (COLS - 1 - col);
+    }
+
+    // ===== BOARD RENDERING =====
+    function renderBoard() {
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const num = getTileNumber(r, c);
+          const sp = SPECIAL_TILES[num];
+          const emoji = sp ? sp.emoji : DECO[num - 1];
+          const color = TILE_COLORS[num - 1];
+          const isSpecial = !!sp;
+          const tile = document.createElement('div');
+          tile.id = `tile-${num}`;
+          tile.className = `tile ${isSpecial ? 'special-tile' : ''}`;
+          tile.style.backgroundColor = color;
+          tile.innerHTML = `
+                <span class="absolute top-0.5 left-1 text-[9px] md:text-[10px] font-bold text-white/70 drop-shadow">${num}</span>
+                <span class="text-base md:text-xl drop-shadow pointer-events-none">${emoji}</span>
+                <div class="tile-tokens" id="tokens-${num}"></div>
+            `;
+          board.appendChild(tile);
+        }
+      }
+    }
+
+    function updateTokens() {
+      for (let i = 1; i <= TOTAL; i++) {
+        document.getElementById(`tokens-${i}`).innerHTML = '';
+      }
+      if (state.playerPos >= 1 && state.playerPos <= TOTAL) {
+        document.getElementById(`tokens-${state.playerPos}`).innerHTML += '<span class="token">😎</span>';
+      }
+      if (state.computerPos >= 1 && state.computerPos <= TOTAL) {
+        document.getElementById(`tokens-${state.computerPos}`).innerHTML += '<span class="token">🤖</span>';
+      }
+    }
+
+    function updatePlayerInfo() {
+      document.getElementById('player-pos-text').textContent = state.playerPos === 0 ? 'START' : state.playerPos >= TOTAL ? '🏆 FINISH' : `Tile ${state.playerPos}`;
+      document.getElementById('computer-pos-text').textContent = state.computerPos === 0 ? 'START' : state.computerPos >= TOTAL ? '🏆 FINISH' : `Tile ${state.computerPos}`;
+    }
+
+    function setStatus(msg) { document.getElementById('status-text').textContent = msg; }
+
+    function setTurnHighlight(who) {
+      document.getElementById('player-card').classList.toggle('turn-active', who === 'player');
+      document.getElementById('computer-card').classList.toggle('turn-active', who === 'computer');
+    }
+
+    // ===== DICE ANIMATION =====
+    function animateDiceRoll() {
+      return new Promise(resolve => {
+        const el = document.getElementById('dice-display');
+        const result = rollDice();
+        let count = 0;
+        el.classList.add('dice-spin');
+        const iv = setInterval(() => {
+          el.textContent = DICE_EMOJIS[Math.floor(Math.random() * 6)];
+          count++;
+          if (count >= 12) {
+            clearInterval(iv);
+            el.classList.remove('dice-spin');
+            el.textContent = DICE_EMOJIS[result - 1];
+            el.classList.add('dice-result');
+            setTimeout(() => { el.classList.remove('dice-result'); resolve(result); }, 350);
+          }
+        }, 80);
+      });
+    }
+
+    // ===== TOKEN MOVEMENT =====
+    async function moveToken(who, from, to) {
+      const start = Math.max(from, 1);
+      if (from === 0) {
+        setPos(who, 1);
+        updateTokens();
+        await delay(180);
+        if (to <= 1) return;
+      }
+      const step = start < to ? 1 : -1;
+      let cur = from === 0 ? 1 : start;
+      while (cur !== to) {
+        cur += step;
+        setPos(who, cur);
+        updateTokens();
+        updatePlayerInfo();
+        const tileEl = document.getElementById(`tile-${cur}`);
+        if (tileEl) tileEl.classList.add('tile-active');
+        await delay(180);
+        if (tileEl) tileEl.classList.remove('tile-active');
+      }
+    }
+
+    function setPos(who, val) {
+      if (who === 'player') state.playerPos = val;
+      else state.computerPos = val;
+    }
+    function getPos(who) {
+      return who === 'player' ? state.playerPos : state.computerPos;
+    }
+
+    // ===== SPECIAL TILE POPUP =====
+    async function showSpecialPopup(emoji, label, detail) {
+      const popup = document.getElementById('special-popup');
+      document.getElementById('popup-emoji').textContent = emoji;
+      document.getElementById('popup-text').textContent = label;
+      document.getElementById('popup-detail').textContent = detail;
+      popup.classList.remove('hidden');
+      popup.querySelector('div').className = 'special-popup text-center';
+      await delay(1200);
+      popup.classList.add('hidden');
+    }
+
+    // ===== SPECIAL TILE HANDLING =====
+    async function handleSpecialTile(who, tileNum) {
+      const sp = SPECIAL_TILES[tileNum];
+      if (!sp) return false;
+      const name = who === 'player' ? '😎 You' : '🤖 Computer';
+
+      await showSpecialPopup(sp.emoji, sp.label, sp.detail);
+
+      switch (sp.type) {
+        case 'boost': {
+          addLog(`⚡ ${name} got a BOOST! +2 tiles!`);
+          const newP = Math.min(getPos(who) + 2, TOTAL);
+          await moveToken(who, getPos(who), newP);
+          setPos(who, newP);
+          break;
+        }
+        case 'trap': {
+          addLog(`🕳️ ${name} fell into a TRAP! -3 tiles!`);
+          const newP = Math.max(getPos(who) - 3, 1);
+          await moveToken(who, getPos(who), newP);
+          setPos(who, newP);
+          break;
+        }
+        case 'swap': {
+          addLog(`🔄 ${name} triggered SWAP! Positions swapped!`);
+          const tmp = state.playerPos;
+          state.playerPos = state.computerPos;
+          state.computerPos = tmp;
+          updateTokens();
+          updatePlayerInfo();
+          break;
+        }
+        case 'lucky': {
+          addLog(`🍀 ${name} landed on LUCKY! Extra turn!`);
+          return true;
+        }
+      }
+      updatePlayerInfo();
+      return false;
+    }
+
+    // ===== GAME LOG =====
+    function addLog(msg) {
+      const log = document.getElementById('game-log');
+      const el = document.createElement('div');
+      el.className = 'log-entry text-xs text-white/50';
+      el.textContent = msg;
+      log.prepend(el);
+      while (log.children.length > 30) log.removeChild(log.lastChild);
+    }
+
+    // ===== PLAYER TURN =====
+    async function handleRoll() {
+      if (state.isAnimating || state.gameOver) return;
+      state.isAnimating = true;
+      document.getElementById('roll-btn').disabled = true;
+
+      const dice = await animateDiceRoll();
+      addLog(`😎 You rolled a ${dice}!`);
+      setStatus(`You rolled ${dice}! Moving...`);
+
+      const newPos = Math.min(state.playerPos + dice, TOTAL);
+      await moveToken('player', state.playerPos, newPos);
+      state.playerPos = newPos;
+      updatePlayerInfo();
+
+      if (state.playerPos >= TOTAL) { endGame('player'); return; }
+
+      const sp = SPECIAL_TILES[state.playerPos];
+      if (sp) {
+        const extra = await handleSpecialTile('player', state.playerPos);
+        if (state.playerPos >= TOTAL) { endGame('player'); return; }
+        if (extra) {
+          setStatus("🍀 Lucky! Roll again!");
+          setTurnHighlight('player');
+          state.isAnimating = false;
+          document.getElementById('roll-btn').disabled = false;
+          return;
+        }
+      }
+
+      await delay(600);
+      state.isAnimating = false;
+      computerTurn();
+    }
+
+    // ===== COMPUTER TURN =====
+    async function computerTurn() {
+      setTurnHighlight('computer');
+      setStatus("🤖 Computer's turn...");
+      document.getElementById('roll-btn').disabled = true;
+      await delay(900);
+
+      const dice = await animateDiceRoll();
+      addLog(`🤖 Computer rolled a ${dice}!`);
+      setStatus(`Computer rolled ${dice}!`);
+
+      const newPos = Math.min(state.computerPos + dice, TOTAL);
+      await moveToken('computer', state.computerPos, newPos);
+      state.computerPos = newPos;
+      updatePlayerInfo();
+
+      if (state.computerPos >= TOTAL) { endGame('computer'); return; }
+
+      const sp = SPECIAL_TILES[state.computerPos];
+      if (sp) {
+        const extra = await handleSpecialTile('computer', state.computerPos);
+        if (state.computerPos >= TOTAL) { endGame('computer'); return; }
+        if (extra) {
+          addLog("🍀 Computer gets another turn!");
+          await delay(600);
+          computerTurn();
+          return;
+        }
+      }
+
+      await delay(600);
+      setStatus("Your turn! 🎲 Roll the dice!");
+      setTurnHighlight('player');
+      state.isAnimating = false;
+      document.getElementById('roll-btn').disabled = false;
+    }
+
+    // ===== END GAME =====
+    function endGame(winner) {
+      state.gameOver = true;
+      state.isAnimating = false;
+      const overlay = document.getElementById('win-overlay');
+      if (winner === 'player') {
+        document.getElementById('win-emoji').textContent = '🎉';
+        document.getElementById('win-title').textContent = 'YOU WIN!';
+        document.getElementById('win-title').className = 'font-display text-4xl md:text-5xl font-black mb-2 text-yellow-400';
+        document.getElementById('win-subtitle').textContent = 'You reached the finish first! 🏆';
+        overlay.classList.remove('hidden');
+        setTimeout(createConfetti, 300);
+      } else {
+        document.getElementById('win-emoji').textContent = '😔';
+        document.getElementById('win-title').textContent = 'YOU LOSE!';
+        document.getElementById('win-title').className = 'font-display text-4xl md:text-5xl font-black mb-2 text-rose-400';
+        document.getElementById('win-subtitle').textContent = 'Computer reached the finish first!';
+        overlay.classList.remove('hidden');
+      }
+    }
+
+    // ===== CONFETTI =====
+    function createConfetti() {
+      const box = document.getElementById('confetti-box');
+      box.innerHTML = '';
+      const colors = ['#fbbf24', '#f87171', '#34d399', '#60a5fa', '#a855f7', '#f472b6', '#fb923c'];
+      for (let i = 0; i < 70; i++) {
+        const p = document.createElement('div');
+        p.className = 'confetti-piece';
+        const sz = Math.random() * 8 + 6;
+        p.style.width = sz + 'px'; p.style.height = sz + 'px';
+        p.style.left = Math.random() * 100 + '%';
+        p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        p.style.borderRadius = Math.random() > .5 ? '50%' : '2px';
+        p.style.setProperty('--fd', (Math.random() * 2 + 2) + 's');
+        p.style.setProperty('--dd', (Math.random() * 2) + 's');
+        p.style.setProperty('--r', (Math.random() * 1080 - 360) + 'deg');
+        box.appendChild(p);
+      }
+      setTimeout(() => { box.innerHTML = ''; }, 5000);
+    }
+
+    // ===== SCREEN MANAGEMENT =====
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    // ===== GAME INIT =====
+    function startGame() {
+      state = { playerPos: 0, computerPos: 0, isAnimating: false, gameOver: false };
+      showScreen('game-screen');
+      renderBoard();
+      updateTokens();
+      updatePlayerInfo();
+      setStatus("Your turn! 🎲 Roll the dice!");
+      setTurnHighlight('player');
+      document.getElementById('roll-btn').disabled = false;
+      document.getElementById('dice-display').textContent = '🎲';
+      document.getElementById('game-log').innerHTML = '';
+      addLog('🏁 Race started! You go first!');
+    }
+
+    function restartGame() {
+      document.getElementById('win-overlay').classList.add('hidden');
+      document.getElementById('confetti-box').innerHTML = '';
+      showScreen('title-screen');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => showScreen('title-screen'));
+  </script>
+</body>
+
+</html>
