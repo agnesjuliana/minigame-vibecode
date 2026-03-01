@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPS Championship League</title>
+    <meta name="description" content="Rock-Paper-Scissors league championship. Compete against 7 AI rivals in a round-robin tournament!">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Outfit', 'sans-serif'],
+                        body: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #0a0a2e 0%, #0f0f3e 40%, #1a0a2e 100%);
+        }
+
+        /* Screen Transitions */
+        .screen { display: none; }
+        .screen.active {
+            display: flex;
+            animation: screenIn 0.4s ease-out;
+        }
+        @keyframes screenIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Glassmorphism Card */
+        .glass {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Floating Emojis on Title */
+        .floating-emoji {
+            position: absolute;
+            font-size: clamp(1.5rem, 4vw, 3rem);
+            opacity: 0.12;
+            animation: floatEmoji var(--dur, 8s) ease-in-out var(--delay, 0s) infinite;
+        }
+        @keyframes floatEmoji {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-30px) rotate(5deg); }
+            50% { transform: translateY(-10px) rotate(-3deg); }
+            75% { transform: translateY(-25px) rotate(4deg); }
+        }
+
+        /* Pulse glow button */
+        .btn-glow {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .btn-glow::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: linear-gradient(45deg, #06b6d4, #a855f7, #ec4899, #06b6d4);
+            background-size: 400% 400%;
+            animation: glowShift 3s ease infinite;
+            border-radius: inherit;
+            z-index: -1;
+            filter: blur(8px);
+            opacity: 0.6;
+        }
+        @keyframes glowShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        /* Hand Shake Animation */
+        .hand-shake {
+            animation: handShake 0.6s ease-in-out infinite;
+        }
+        @keyframes handShake {
+            0%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-18px); }
+            60% { transform: translateY(6px); }
+        }
+
+        /* Reveal Pop */
+        .reveal-pop {
+            animation: revealPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes revealPop {
+            0% { transform: scale(0.3); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Result Flash */
+        .result-flash {
+            animation: resultFlash 0.5s ease-out;
+        }
+        @keyframes resultFlash {
+            0% { transform: scale(0.5); opacity: 0; }
+            60% { transform: scale(1.15); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Move Buttons Hover */
+        .move-btn {
+            transition: all 0.2s ease;
+        }
+        .move-btn:hover:not(:disabled) {
+            transform: translateY(-6px) scale(1.05);
+            box-shadow: 0 8px 30px rgba(6, 182, 212, 0.3);
+        }
+        .move-btn:active:not(:disabled) {
+            transform: translateY(-2px) scale(0.98);
+        }
+        .move-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* Confetti */
+        .confetti-piece {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            top: -20px;
+            z-index: 100;
+            animation: confettiFall var(--fall-dur, 3s) linear var(--fall-delay, 0s) forwards;
+        }
+        @keyframes confettiFall {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            80% { opacity: 1; }
+            100% { transform: translateY(100vh) rotate(var(--rot, 720deg)); opacity: 0; }
+        }
+
+        /* Player row highlight */
+        .player-row {
+            background: linear-gradient(90deg, rgba(251, 191, 36, 0.08) 0%, rgba(251, 191, 36, 0.02) 100%);
+            border-left: 3px solid #fbbf24;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+        /* Table row hover */
+        .standings-row {
+            transition: background 0.2s ease;
+        }
+        .standings-row:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        /* Fixture card */
+        .fixture-card {
+            transition: all 0.2s ease;
+        }
+        .fixture-card:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        /* Slide up animation for matchday results */
+        .slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Score counter animation */
+        .score-bump {
+            animation: scoreBump 0.3s ease;
+        }
+        @keyframes scoreBump {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.4); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="text-white font-body min-h-screen overflow-x-hidden">
+
+    <!-- ==================== TITLE SCREEN ==================== -->
+    <div id="title-screen" class="screen active flex-col items-center justify-center min-h-screen relative overflow-hidden px-4">
+        <!-- Floating Background Emojis -->
+        <div class="absolute inset-0 pointer-events-none overflow-hidden">
+            <span class="floating-emoji" style="left:5%;top:15%;--dur:7s;--delay:0s">🪨</span>
+            <span class="floating-emoji" style="left:85%;top:10%;--dur:9s;--delay:1s">📄</span>
+            <span class="floating-emoji" style="left:15%;top:70%;--dur:6s;--delay:0.5s">✂️</span>
+            <span class="floating-emoji" style="left:75%;top:65%;--dur:8s;--delay:2s">🪨</span>
+            <span class="floating-emoji" style="left:45%;top:80%;--dur:7s;--delay:1.5s">📄</span>
+            <span class="floating-emoji" style="left:90%;top:40%;--dur:10s;--delay:0.8s">✂️</span>
+            <span class="floating-emoji" style="left:30%;top:25%;--dur:8s;--delay:2.5s">🪨</span>
+            <span class="floating-emoji" style="left:60%;top:45%;--dur:6s;--delay:3s">✂️</span>
+            <span class="floating-emoji" style="left:10%;top:45%;--dur:9s;--delay:1.2s">📄</span>
+            <span class="floating-emoji" style="left:50%;top:15%;--dur:7.5s;--delay:0.3s">🪨</span>
+        </div>
+
+        <!-- Content -->
+        <div class="relative z-10 text-center">
+            <div class="mb-6">
+                <span class="text-6xl md:text-7xl inline-block animate-bounce">✊</span>
+            </div>
+            <h1 class="font-display text-6xl md:text-8xl font-black bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-1 leading-tight">
+                RPS
+            </h1>
+            <h2 class="font-display text-2xl md:text-4xl font-bold text-white/80 tracking-[0.3em] mb-3">
+                CHAMPIONSHIP
+            </h2>
+            <div class="flex items-center justify-center gap-3 mb-8">
+                <span class="h-px w-12 bg-gradient-to-r from-transparent to-cyan-500/50"></span>
+                <span class="text-cyan-400/70 text-sm font-semibold tracking-widest uppercase">League</span>
+                <span class="h-px w-12 bg-gradient-to-l from-transparent to-cyan-500/50"></span>
+            </div>
+            <p class="text-white/40 text-base md:text-lg max-w-md mx-auto mb-12 leading-relaxed">
+                Compete against 7 rivals in a round-robin tournament.<br class="hidden md:block">
+                Fight your way to <span class="text-amber-400 font-bold">#1</span> in the standings!
+            </p>
+            <button onclick="startGame()" class="btn-glow relative bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-display font-bold text-lg md:text-xl px-10 py-4 rounded-2xl tracking-wider transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer">
+                START LEAGUE
+            </button>
+            <p class="mt-6 text-white/20 text-sm">Best of 5 · 7 Matchdays · 8 Players</p>
+        </div>
+    </div>
+
+    <!-- ==================== STANDINGS SCREEN ==================== -->
+    <div id="standings-screen" class="screen flex-col min-h-screen px-4 py-6 md:py-8">
+        <!-- Header -->
+        <div class="max-w-4xl mx-auto w-full mb-6 md:mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="font-display text-2xl md:text-3xl font-bold text-white">
+                        🏆 <span class="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">RPS Championship</span>
+                    </h1>
+                </div>
+                <div class="glass rounded-xl px-4 py-2 text-center">
+                    <p class="text-white/40 text-xs uppercase tracking-wider">Matchday</p>
+                    <p class="font-display font-bold text-lg text-white" id="matchday-label">1 / 7</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content: Standings + Fixtures -->
+        <div class="max-w-4xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <!-- Standings Table -->
+            <div class="lg:col-span-3 glass rounded-2xl p-4 md:p-6">
+                <h2 class="font-display font-bold text-lg text-white/80 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-5 bg-cyan-400 rounded-full"></span>
+                    Standings
+                </h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-white/30 text-xs uppercase tracking-wider border-b border-white/5">
+                                <th class="py-3 px-2 text-center w-10">#</th>
+                                <th class="py-3 px-2 text-left">Player</th>
+                                <th class="py-3 px-2 text-center w-12">MP</th>
+                                <th class="py-3 px-2 text-center w-12">W</th>
+                                <th class="py-3 px-2 text-center w-12">L</th>
+                                <th class="py-3 px-2 text-center w-14">PTS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="standings-tbody">
+                            <!-- Rendered by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Fixtures Panel -->
+            <div class="lg:col-span-2 glass rounded-2xl p-4 md:p-6">
+                <h2 class="font-display font-bold text-lg text-white/80 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-5 bg-purple-400 rounded-full"></span>
+                    <span id="fixtures-title">Fixtures</span>
+                </h2>
+                <div id="fixtures-container" class="space-y-3">
+                    <!-- Rendered by JS -->
+                </div>
+
+                <!-- Action Button -->
+                <div class="mt-6" id="standings-action-area">
+                    <!-- Rendered by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Player Rank Summary -->
+        <div class="max-w-4xl mx-auto w-full mt-6">
+            <div id="rank-summary" class="glass rounded-xl px-5 py-3 text-center">
+                <!-- Rendered by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MATCH SCREEN ==================== -->
+    <div id="match-screen" class="screen flex-col items-center justify-center min-h-screen px-4 py-6 relative">
+        <!-- Match Header -->
+        <div class="text-center mb-6">
+            <p class="text-white/30 text-xs uppercase tracking-widest mb-1" id="match-matchday-label">Matchday 1</p>
+            <p class="text-white/50 text-sm" id="match-round-label">— First to 3 wins —</p>
+        </div>
+
+        <!-- VS Display -->
+        <div class="flex items-center justify-center gap-6 md:gap-12 mb-4">
+            <!-- Player Side -->
+            <div class="text-center">
+                <div class="text-4xl md:text-5xl mb-2" id="match-player-emoji">🧑</div>
+                <p class="font-display font-bold text-sm md:text-base text-white/90">You</p>
+            </div>
+
+            <!-- Score -->
+            <div class="flex items-center gap-3 md:gap-5">
+                <span class="font-display text-4xl md:text-6xl font-black text-white" id="match-player-score">0</span>
+                <span class="text-white/20 font-display text-2xl md:text-3xl">—</span>
+                <span class="font-display text-4xl md:text-6xl font-black text-white" id="match-opponent-score">0</span>
+            </div>
+
+            <!-- Opponent Side -->
+            <div class="text-center">
+                <div class="text-4xl md:text-5xl mb-2" id="match-opponent-emoji">🪨</div>
+                <p class="font-display font-bold text-sm md:text-base text-white/90" id="match-opponent-name">Rocky</p>
+            </div>
+        </div>
+
+        <!-- Battle Arena -->
+        <div class="glass rounded-2xl p-6 md:p-10 w-full max-w-lg mb-6 relative">
+            <!-- Hands Display -->
+            <div class="flex items-center justify-around mb-4">
+                <div class="text-center">
+                    <div class="text-5xl md:text-7xl mb-2 min-h-[80px] md:min-h-[100px] flex items-center justify-center" id="hand-player">
+                        <span class="text-5xl md:text-7xl">✊</span>
+                    </div>
+                    <p class="text-white/30 text-xs uppercase tracking-wider">You</p>
+                </div>
+                <div class="text-white/10 font-display text-xl md:text-2xl font-bold">VS</div>
+                <div class="text-center">
+                    <div class="text-5xl md:text-7xl mb-2 min-h-[80px] md:min-h-[100px] flex items-center justify-center" id="hand-opponent">
+                        <span class="text-5xl md:text-7xl">✊</span>
+                    </div>
+                    <p class="text-white/30 text-xs uppercase tracking-wider" id="hand-opponent-label">Opponent</p>
+                </div>
+            </div>
+
+            <!-- Round Result Text -->
+            <div class="text-center min-h-[60px] flex flex-col items-center justify-center" id="round-result-area">
+                <p class="text-white/30 text-sm">Choose your move!</p>
+            </div>
+        </div>
+
+        <!-- Move Buttons -->
+        <div class="flex gap-4 md:gap-6" id="move-buttons">
+            <button onclick="playerChoose('rock')" class="move-btn glass rounded-2xl p-4 md:p-6 flex flex-col items-center gap-2 cursor-pointer min-w-[90px] md:min-w-[110px]">
+                <span class="text-3xl md:text-4xl">🪨</span>
+                <span class="text-xs md:text-sm font-semibold text-white/60">Rock</span>
+            </button>
+            <button onclick="playerChoose('paper')" class="move-btn glass rounded-2xl p-4 md:p-6 flex flex-col items-center gap-2 cursor-pointer min-w-[90px] md:min-w-[110px]">
+                <span class="text-3xl md:text-4xl">📄</span>
+                <span class="text-xs md:text-sm font-semibold text-white/60">Paper</span>
+            </button>
+            <button onclick="playerChoose('scissors')" class="move-btn glass rounded-2xl p-4 md:p-6 flex flex-col items-center gap-2 cursor-pointer min-w-[90px] md:min-w-[110px]">
+                <span class="text-3xl md:text-4xl">✂️</span>
+                <span class="text-xs md:text-sm font-semibold text-white/60">Scissors</span>
+            </button>
+        </div>
+
+        <!-- Round History Dots -->
+        <div class="mt-6 flex items-center gap-2" id="round-history">
+            <!-- Rendered by JS -->
+        </div>
+
+        <!-- Match Result Overlay -->
+        <div id="match-result-overlay" class="hidden absolute inset-0 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center z-50 px-4">
+            <div class="text-center result-flash">
+                <div class="text-6xl mb-4" id="result-emoji">🏆</div>
+                <h2 class="font-display text-4xl md:text-5xl font-black mb-3" id="result-title">VICTORY!</h2>
+                <p class="text-white/60 text-lg mb-2" id="result-detail">You beat Rocky 3-1</p>
+                <p class="text-3xl font-display font-bold mb-8" id="result-points">+3 PTS</p>
+                <button onclick="continueAfterMatch()" class="bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-display font-bold text-lg px-10 py-4 rounded-2xl tracking-wider transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer">
+                    CONTINUE
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SEASON END SCREEN ==================== -->
+    <div id="season-end-screen" class="screen flex-col items-center justify-center min-h-screen px-4 py-8 relative overflow-hidden">
+        <div id="confetti-container" class="fixed inset-0 pointer-events-none z-50"></div>
+
+        <div class="relative z-10 w-full max-w-lg text-center">
+            <div class="text-6xl md:text-7xl mb-4" id="season-end-emoji">🏆</div>
+            <h1 class="font-display text-3xl md:text-5xl font-black mb-2" id="season-end-title">SEASON COMPLETE!</h1>
+            <p class="text-white/50 text-lg mb-8" id="season-end-subtitle">Final Standings</p>
+
+            <!-- Final Standings -->
+            <div class="glass rounded-2xl p-4 md:p-6 mb-6 text-left">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-white/30 text-xs uppercase tracking-wider border-b border-white/5">
+                            <th class="py-2 px-2 text-center">#</th>
+                            <th class="py-2 px-2 text-left">Player</th>
+                            <th class="py-2 px-2 text-center">W</th>
+                            <th class="py-2 px-2 text-center">L</th>
+                            <th class="py-2 px-2 text-center">PTS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="final-standings-tbody">
+                        <!-- Rendered by JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Player Stats -->
+            <div class="glass rounded-2xl p-4 md:p-5 mb-8">
+                <h3 class="font-display font-bold text-sm text-white/50 uppercase tracking-wider mb-3">Your Season Stats</h3>
+                <div class="grid grid-cols-3 gap-4" id="season-stats">
+                    <!-- Rendered by JS -->
+                </div>
+            </div>
+
+            <button onclick="restartGame()" class="btn-glow relative bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-display font-bold text-lg px-10 py-4 rounded-2xl tracking-wider transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer">
+                PLAY AGAIN
+            </button>
+        </div>
+    </div>
+
+    <!-- ==================== GAME LOGIC ==================== -->
+    <script>
+    // ============================
+    //  CONSTANTS
+    // ============================
+    const MOVES = ['rock', 'paper', 'scissors'];
+    const MOVE_EMOJIS = { rock: '🪨', paper: '📄', scissors: '✂️' };
+    const RESULT_FLAVOR = {
+        'rock-scissors': 'Rock crushes Scissors!',
+        'scissors-paper': 'Scissors cuts Paper!',
+        'paper-rock': 'Paper covers Rock!',
+    };
+
+    const PLAYER_DEFS = [
+        { id: 0, name: 'You',     emoji: '🧑', strategy: 'human' },
+        { id: 1, name: 'Rocky',   emoji: '🪨', strategy: 'rock-heavy' },
+        { id: 2, name: 'Slice',   emoji: '✂️', strategy: 'scissors-heavy' },
+        { id: 3, name: 'Leafy',   emoji: '📄', strategy: 'paper-heavy' },
+        { id: 4, name: 'Copycat', emoji: '🐱', strategy: 'copycat' },
+        { id: 5, name: 'Analyst', emoji: '🧠', strategy: 'analyst' },
+        { id: 6, name: 'Chaos',   emoji: '🎲', strategy: 'random' },
+        { id: 7, name: 'Jinx',    emoji: '🔮', strategy: 'counter-last' },
+    ];
+
+    const WINS_NEEDED = 3;
+
+    // ============================
+    //  GAME STATE
+    // ============================
+    let game = {
+        players: [],
+        schedule: [],           // Array of matchdays, each matchday is array of [p1Id, p2Id]
+        currentMatchday: 0,
+        matchdayPlayed: false,  // Whether current matchday has been played
+        matchdayResults: [],    // Results for current matchday
+        match: null,            // Current active match state
+    };
+
+    // ============================
+    //  UTILITIES
+    // ============================
+    function randomMove() {
+        return MOVES[Math.floor(Math.random() * 3)];
+    }
+
+    function weightedRandom(weights) {
+        // weights: [['rock', 60], ['paper', 20], ['scissors', 20]]
+        const total = weights.reduce((s, w) => s + w[1], 0);
+        let r = Math.random() * total;
+        for (const [move, weight] of weights) {
+            r -= weight;
+            if (r <= 0) return move;
+        }
+        return weights[weights.length - 1][0];
+    }
+
+    function counterMove(move) {
+        return { rock: 'paper', paper: 'scissors', scissors: 'rock' }[move];
+    }
+
+    function determineRoundWinner(move1, move2) {
+        if (move1 === move2) return 'draw';
+        if (
+            (move1 === 'rock' && move2 === 'scissors') ||
+            (move1 === 'scissors' && move2 === 'paper') ||
+            (move1 === 'paper' && move2 === 'rock')
+        ) return 'p1';
+        return 'p2';
+    }
+
+    // ============================
+    //  SCHEDULE GENERATION (Circle Method)
+    // ============================
+    function generateSchedule(numPlayers) {
+        const players = Array.from({ length: numPlayers }, (_, i) => i);
+        const rounds = [];
+
+        for (let round = 0; round < numPlayers - 1; round++) {
+            const matches = [];
+            for (let i = 0; i < numPlayers / 2; i++) {
+                matches.push([players[i], players[numPlayers - 1 - i]]);
+            }
+            rounds.push(matches);
+            // Rotate: fix players[0], rotate rest clockwise
+            const last = players.pop();
+            players.splice(1, 0, last);
+        }
+
+        return rounds;
+    }
+
+    // ============================
+    //  AI STRATEGIES
+    // ============================
+    function getAIMove(strategyName, opponentMoves, ownMoves) {
+        switch (strategyName) {
+            case 'rock-heavy':
+                return weightedRandom([['rock', 60], ['paper', 20], ['scissors', 20]]);
+            case 'scissors-heavy':
+                return weightedRandom([['scissors', 60], ['rock', 20], ['paper', 20]]);
+            case 'paper-heavy':
+                return weightedRandom([['paper', 60], ['rock', 20], ['scissors', 20]]);
+            case 'copycat':
+                return opponentMoves.length > 0 ? opponentMoves[opponentMoves.length - 1] : randomMove();
+            case 'analyst':
+                if (opponentMoves.length < 3) return randomMove();
+                const counts = { rock: 0, paper: 0, scissors: 0 };
+                opponentMoves.forEach(m => counts[m]++);
+                const mostUsed = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+                return counterMove(mostUsed);
+            case 'random':
+                return randomMove();
+            case 'counter-last':
+                return opponentMoves.length > 0 ? counterMove(opponentMoves[opponentMoves.length - 1]) : randomMove();
+            default:
+                return randomMove();
+        }
+    }
+
+    // ============================
+    //  MATCH LOGIC
+    // ============================
+    function simulateMatch(p1Id, p2Id) {
+        const p1 = game.players[p1Id];
+        const p2 = game.players[p2Id];
+        let p1Wins = 0, p2Wins = 0;
+        const p1Moves = [], p2Moves = [];
+        let rounds = 0;
+
+        while (p1Wins < WINS_NEEDED && p2Wins < WINS_NEEDED && rounds < 20) {
+            const m1 = getAIMove(p1.strategy, p2Moves, p1Moves);
+            const m2 = getAIMove(p2.strategy, p1Moves, p2Moves);
+            p1Moves.push(m1);
+            p2Moves.push(m2);
+            const result = determineRoundWinner(m1, m2);
+            if (result === 'p1') p1Wins++;
+            else if (result === 'p2') p2Wins++;
+            rounds++;
+        }
+
+        // Determine winner
+        const winner = p1Wins >= p2Wins ? p1Id : p2Id;
+        const loser = winner === p1Id ? p2Id : p1Id;
+
+        // Update stats
+        game.players[winner].stats.wins++;
+        game.players[winner].stats.points += 3;
+        game.players[loser].stats.losses++;
+        game.players[winner].stats.played++;
+        game.players[loser].stats.played++;
+
+        return { p1: p1Id, p2: p2Id, score1: p1Wins, score2: p2Wins, winner };
+    }
+
+    // ============================
+    //  SCREEN MANAGEMENT
+    // ============================
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
+
+    // ============================
+    //  STANDINGS RENDERING
+    // ============================
+    function computeStandings() {
+        return [...game.players]
+            .sort((a, b) => {
+                if (b.stats.points !== a.stats.points) return b.stats.points - a.stats.points;
+                // Tiebreaker: more wins
+                if (b.stats.wins !== a.stats.wins) return b.stats.wins - a.stats.wins;
+                // Tiebreaker: fewer losses
+                return a.stats.losses - b.stats.losses;
+            });
+    }
+
+    function getPlayerRank() {
+        const standings = computeStandings();
+        return standings.findIndex(p => p.id === 0) + 1;
+    }
+
+    function renderStandings() {
+        const standings = computeStandings();
+        const tbody = document.getElementById('standings-tbody');
+        const rankBadges = ['🥇', '🥈', '🥉'];
+
+        tbody.innerHTML = standings.map((p, i) => {
+            const isPlayer = p.id === 0;
+            const badge = i < 3 ? rankBadges[i] : `<span class="text-white/30">${i + 1}</span>`;
+            return `
+                <tr class="standings-row ${isPlayer ? 'player-row' : ''} border-b border-white/[0.03]">
+                    <td class="py-3 px-2 text-center">${badge}</td>
+                    <td class="py-3 px-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">${p.emoji}</span>
+                            <span class="font-semibold ${isPlayer ? 'text-amber-400' : 'text-white/80'}">${p.name}</span>
+                            ${isPlayer ? '<span class="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">YOU</span>' : ''}
+                        </div>
+                    </td>
+                    <td class="py-3 px-2 text-center text-white/40">${p.stats.played}</td>
+                    <td class="py-3 px-2 text-center text-emerald-400/80">${p.stats.wins}</td>
+                    <td class="py-3 px-2 text-center text-rose-400/80">${p.stats.losses}</td>
+                    <td class="py-3 px-2 text-center font-display font-bold text-white">${p.stats.points}</td>
+                </tr>
+            `;
+        }).join('');
+
+        // Update matchday label
+        document.getElementById('matchday-label').textContent = `${game.currentMatchday + 1} / 7`;
+
+        // Update rank summary
+        const rank = getPlayerRank();
+        const rankSummary = document.getElementById('rank-summary');
+        const rankMessages = {
+            1: { text: "You're leading the league! 🔥", color: 'text-amber-400' },
+            2: { text: "So close to the top! Keep pushing! 💪", color: 'text-cyan-400' },
+            3: { text: "Podium position. Can you go higher? ⬆️", color: 'text-purple-400' },
+        };
+        const msg = rankMessages[rank] || { text: `You're #${rank}. Time to climb! 🧗`, color: 'text-white/60' };
+        rankSummary.innerHTML = `
+            <p class="text-white/30 text-xs uppercase tracking-wider mb-1">Your Position</p>
+            <p class="font-display font-bold text-lg ${msg.color}">#${rank} — ${msg.text}</p>
+        `;
+    }
+
+    function renderFixtures() {
+        const matchday = game.schedule[game.currentMatchday];
+        const container = document.getElementById('fixtures-container');
+        const title = document.getElementById('fixtures-title');
+
+        if (game.matchdayPlayed) {
+            title.textContent = `Matchday ${game.currentMatchday + 1} Results`;
+        } else {
+            title.textContent = `Matchday ${game.currentMatchday + 1} Fixtures`;
+        }
+
+        container.innerHTML = matchday.map(([p1Id, p2Id], idx) => {
+            const p1 = game.players[p1Id];
+            const p2 = game.players[p2Id];
+            const isPlayerMatch = p1Id === 0 || p2Id === 0;
+            const result = game.matchdayResults.find(r =>
+                (r.p1 === p1Id && r.p2 === p2Id) || (r.p1 === p2Id && r.p2 === p1Id)
+            );
+
+            if (result) {
+                const s1 = result.p1 === p1Id ? result.score1 : result.score2;
+                const s2 = result.p1 === p1Id ? result.score2 : result.score1;
+                const winnerSide = result.winner === p1Id ? 'left' : 'right';
+                return `
+                    <div class="fixture-card glass rounded-xl px-4 py-3 slide-up ${isPlayerMatch ? 'border border-amber-500/20' : ''}" style="animation-delay:${idx * 80}ms">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 flex-1 ${winnerSide === 'left' ? 'font-bold' : 'opacity-60'}">
+                                <span>${p1.emoji}</span>
+                                <span class="text-sm truncate">${p1.name}</span>
+                            </div>
+                            <div class="flex items-center gap-2 mx-3">
+                                <span class="font-display font-bold text-base ${winnerSide === 'left' ? 'text-emerald-400' : 'text-white/80'}">${s1}</span>
+                                <span class="text-white/20 text-xs">-</span>
+                                <span class="font-display font-bold text-base ${winnerSide === 'right' ? 'text-emerald-400' : 'text-white/80'}">${s2}</span>
+                            </div>
+                            <div class="flex items-center gap-2 flex-1 justify-end ${winnerSide === 'right' ? 'font-bold' : 'opacity-60'}">
+                                <span class="text-sm truncate">${p2.name}</span>
+                                <span>${p2.emoji}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="fixture-card glass rounded-xl px-4 py-3 ${isPlayerMatch ? 'border border-cyan-500/30 bg-cyan-500/5' : ''}">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 flex-1">
+                                <span>${p1.emoji}</span>
+                                <span class="text-sm text-white/70">${p1.name}</span>
+                            </div>
+                            <span class="text-white/20 text-xs mx-3 font-display">VS</span>
+                            <div class="flex items-center gap-2 flex-1 justify-end">
+                                <span class="text-sm text-white/70">${p2.name}</span>
+                                <span>${p2.emoji}</span>
+                            </div>
+                        </div>
+                        ${isPlayerMatch ? '<p class="text-center text-cyan-400 text-[10px] font-bold mt-1 uppercase tracking-widest">⚔️ Your Match</p>' : ''}
+                    </div>
+                `;
+            }
+        }).join('');
+
+        // Action button
+        const actionArea = document.getElementById('standings-action-area');
+        if (!game.matchdayPlayed) {
+            actionArea.innerHTML = `
+                <button onclick="startPlayerMatch()" class="w-full bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-display font-bold text-base py-3 rounded-xl tracking-wider transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer">
+                    ⚔️ PLAY YOUR MATCH
+                </button>
+            `;
+        } else if (game.currentMatchday < 6) {
+            actionArea.innerHTML = `
+                <button onclick="nextMatchday()" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-display font-bold text-base py-3 rounded-xl tracking-wider transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer">
+                    NEXT MATCHDAY →
+                </button>
+            `;
+        } else {
+            actionArea.innerHTML = `
+                <button onclick="showSeasonEnd()" class="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-display font-bold text-base py-3 rounded-xl tracking-wider transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer">
+                    🏆 VIEW FINAL RESULTS
+                </button>
+            `;
+        }
+    }
+
+    // ============================
+    //  MATCH SCREEN
+    // ============================
+    function findPlayerMatch() {
+        const matchday = game.schedule[game.currentMatchday];
+        for (const [p1, p2] of matchday) {
+            if (p1 === 0 || p2 === 0) {
+                return p1 === 0 ? p2 : p1;
+            }
+        }
+        return 1; // Fallback
+    }
+
+    function startPlayerMatch() {
+        const opponentId = findPlayerMatch();
+        const opponent = game.players[opponentId];
+
+        game.match = {
+            opponentId,
+            playerScore: 0,
+            opponentScore: 0,
+            roundNum: 0,
+            playerMoves: [],
+            opponentMoves: [],
+            isAnimating: false,
+            roundResults: [], // 'win', 'lose', 'draw' for each round
+        };
+
+        // Setup match screen
+        document.getElementById('match-matchday-label').textContent = `Matchday ${game.currentMatchday + 1}`;
+        document.getElementById('match-round-label').textContent = '— First to 3 wins —';
+        document.getElementById('match-player-score').textContent = '0';
+        document.getElementById('match-opponent-score').textContent = '0';
+        document.getElementById('match-opponent-emoji').textContent = opponent.emoji;
+        document.getElementById('match-opponent-name').textContent = opponent.name;
+        document.getElementById('hand-opponent-label').textContent = opponent.name;
+        document.getElementById('round-result-area').innerHTML = '<p class="text-white/30 text-sm">Choose your move!</p>';
+        document.getElementById('round-history').innerHTML = '';
+        document.getElementById('match-result-overlay').classList.add('hidden');
+
+        resetHands();
+        enableMoveButtons(true);
+        showScreen('match-screen');
+    }
+
+    function resetHands() {
+        document.getElementById('hand-player').innerHTML = '<span class="text-5xl md:text-7xl">✊</span>';
+        document.getElementById('hand-opponent').innerHTML = '<span class="text-5xl md:text-7xl">✊</span>';
+    }
+
+    function enableMoveButtons(enabled) {
+        document.querySelectorAll('#move-buttons button').forEach(btn => {
+            btn.disabled = !enabled;
+        });
+    }
+
+    function playerChoose(move) {
+        if (!game.match || game.match.isAnimating) return;
+        game.match.isAnimating = true;
+        enableMoveButtons(false);
+
+        const opponent = game.players[game.match.opponentId];
+        const aiMove = getAIMove(opponent.strategy, game.match.playerMoves, game.match.opponentMoves);
+
+        game.match.playerMoves.push(move);
+        game.match.opponentMoves.push(aiMove);
+        game.match.roundNum++;
+
+        // Shake animation
+        const handPlayer = document.getElementById('hand-player');
+        const handOpponent = document.getElementById('hand-opponent');
+        handPlayer.innerHTML = '<span class="text-5xl md:text-7xl hand-shake">✊</span>';
+        handOpponent.innerHTML = '<span class="text-5xl md:text-7xl hand-shake">✊</span>';
+        document.getElementById('round-result-area').innerHTML = '<p class="text-white/50 text-sm font-display">...</p>';
+
+        // Reveal after shake
+        setTimeout(() => {
+            // Show moves
+            handPlayer.innerHTML = `<span class="text-5xl md:text-7xl reveal-pop">${MOVE_EMOJIS[move]}</span>`;
+            handOpponent.innerHTML = `<span class="text-5xl md:text-7xl reveal-pop">${MOVE_EMOJIS[aiMove]}</span>`;
+
+            // Determine result
+            const result = determineRoundWinner(move, aiMove);
+
+            if (result === 'p1') {
+                game.match.playerScore++;
+                game.match.roundResults.push('win');
+            } else if (result === 'p2') {
+                game.match.opponentScore++;
+                game.match.roundResults.push('lose');
+            } else {
+                game.match.roundResults.push('draw');
+            }
+
+            // Update score display with bump animation
+            updateMatchScore();
+
+            // Show result text
+            const resultArea = document.getElementById('round-result-area');
+            const flavorKey = result !== 'draw' ? (result === 'p1' ? `${move}-${aiMove}` : `${aiMove}-${move}`) : null;
+            const flavor = flavorKey ? RESULT_FLAVOR[flavorKey] || '' : '';
+
+            if (result === 'draw') {
+                resultArea.innerHTML = `
+                    <p class="text-white/50 text-lg font-display font-bold result-flash">DRAW!</p>
+                    <p class="text-white/30 text-xs mt-1">Round doesn't count</p>
+                `;
+            } else if (result === 'p1') {
+                resultArea.innerHTML = `
+                    <p class="text-emerald-400 text-lg font-display font-bold result-flash">YOU WIN!</p>
+                    <p class="text-white/30 text-xs mt-1">${flavor}</p>
+                `;
+            } else {
+                resultArea.innerHTML = `
+                    <p class="text-rose-400 text-lg font-display font-bold result-flash">YOU LOSE!</p>
+                    <p class="text-white/30 text-xs mt-1">${flavor}</p>
+                `;
+            }
+
+            // Update round history dots
+            renderRoundHistory();
+
+            // Check if match is over
+            setTimeout(() => {
+                if (game.match.playerScore >= WINS_NEEDED || game.match.opponentScore >= WINS_NEEDED) {
+                    finishMatch();
+                } else {
+                    // Reset for next round
+                    setTimeout(() => {
+                        resetHands();
+                        document.getElementById('round-result-area').innerHTML = '<p class="text-white/30 text-sm">Choose your move!</p>';
+                        game.match.isAnimating = false;
+                        enableMoveButtons(true);
+                    }, 800);
+                }
+            }, 1000);
+        }, 1200); // Shake duration
+    }
+
+    function updateMatchScore() {
+        const playerScoreEl = document.getElementById('match-player-score');
+        const opponentScoreEl = document.getElementById('match-opponent-score');
+        playerScoreEl.textContent = game.match.playerScore;
+        opponentScoreEl.textContent = game.match.opponentScore;
+        playerScoreEl.classList.add('score-bump');
+        opponentScoreEl.classList.add('score-bump');
+        setTimeout(() => {
+            playerScoreEl.classList.remove('score-bump');
+            opponentScoreEl.classList.remove('score-bump');
+        }, 300);
+    }
+
+    function renderRoundHistory() {
+        const container = document.getElementById('round-history');
+        container.innerHTML = game.match.roundResults.map(r => {
+            const colors = { win: 'bg-emerald-400', lose: 'bg-rose-400', draw: 'bg-white/20' };
+            return `<span class="w-3 h-3 rounded-full ${colors[r]} reveal-pop"></span>`;
+        }).join('');
+    }
+
+    function finishMatch() {
+        const won = game.match.playerScore >= WINS_NEEDED;
+        const opponent = game.players[game.match.opponentId];
+
+        // Update player stats
+        if (won) {
+            game.players[0].stats.wins++;
+            game.players[0].stats.points += 3;
+            game.players[game.match.opponentId].stats.losses++;
+        } else {
+            game.players[0].stats.losses++;
+            game.players[game.match.opponentId].stats.wins++;
+            game.players[game.match.opponentId].stats.points += 3;
+        }
+        game.players[0].stats.played++;
+        game.players[game.match.opponentId].stats.played++;
+
+        // Track player move stats
+        game.match.playerMoves.forEach(m => {
+            game.players[0].moveStats[m]++;
+        });
+
+        // Show result overlay
+        const overlay = document.getElementById('match-result-overlay');
+        document.getElementById('result-emoji').textContent = won ? '🎉' : '😔';
+        document.getElementById('result-title').textContent = won ? 'VICTORY!' : 'DEFEAT';
+        document.getElementById('result-title').className = `font-display text-4xl md:text-5xl font-black mb-3 ${won ? 'text-emerald-400' : 'text-rose-400'}`;
+        document.getElementById('result-detail').textContent = `${won ? 'You beat' : 'You lost to'} ${opponent.name} ${game.match.playerScore}-${game.match.opponentScore}`;
+        document.getElementById('result-points').textContent = won ? '+3 PTS' : '+0 PTS';
+        document.getElementById('result-points').className = `text-3xl font-display font-bold mb-8 ${won ? 'text-emerald-400' : 'text-rose-400/50'}`;
+
+        overlay.classList.remove('hidden');
+        overlay.querySelector('div').className = 'text-center result-flash';
+    }
+
+    function continueAfterMatch() {
+        game.matchdayPlayed = true;
+
+        // Store player match result
+        const playerResult = {
+            p1: 0,
+            p2: game.match.opponentId,
+            score1: game.match.playerScore,
+            score2: game.match.opponentScore,
+            winner: game.match.playerScore >= WINS_NEEDED ? 0 : game.match.opponentId,
+        };
+        game.matchdayResults.push(playerResult);
+
+        // Simulate other AI vs AI matches
+        const matchday = game.schedule[game.currentMatchday];
+        for (const [p1, p2] of matchday) {
+            if (p1 === 0 || p2 === 0) continue; // Skip player match (already played)
+            const result = simulateMatch(p1, p2);
+            game.matchdayResults.push(result);
+        }
+
+        game.match = null;
+
+        // Go back to standings
+        showScreen('standings-screen');
+        renderStandings();
+        renderFixtures();
+    }
+
+    // ============================
+    //  MATCHDAY FLOW
+    // ============================
+    function nextMatchday() {
+        game.currentMatchday++;
+        game.matchdayPlayed = false;
+        game.matchdayResults = [];
+        renderStandings();
+        renderFixtures();
+    }
+
+    // ============================
+    //  SEASON END
+    // ============================
+    function showSeasonEnd() {
+        showScreen('season-end-screen');
+
+        const standings = computeStandings();
+        const playerRank = standings.findIndex(p => p.id === 0) + 1;
+        const player = game.players[0];
+
+        // Title & emoji based on rank
+        const endConfig = {
+            1: { emoji: '🏆', title: 'CHAMPION!', subtitle: 'You dominated the league!', titleColor: 'text-amber-400' },
+            2: { emoji: '🥈', title: 'RUNNER UP', subtitle: 'So close to the title!', titleColor: 'text-gray-300' },
+            3: { emoji: '🥉', title: 'BRONZE FINISH', subtitle: 'Solid performance!', titleColor: 'text-orange-400' },
+        };
+        const cfg = endConfig[playerRank] || {
+            emoji: '📊', title: `#${playerRank} FINISH`,
+            subtitle: playerRank <= 5 ? 'Not bad, try again!' : 'Rough season. Rematch?',
+            titleColor: 'text-white/70'
+        };
+
+        document.getElementById('season-end-emoji').textContent = cfg.emoji;
+        document.getElementById('season-end-title').textContent = cfg.title;
+        document.getElementById('season-end-title').className = `font-display text-3xl md:text-5xl font-black mb-2 ${cfg.titleColor}`;
+        document.getElementById('season-end-subtitle').textContent = cfg.subtitle;
+
+        // Final standings table
+        const rankBadges = ['🥇', '🥈', '🥉'];
+        const tbody = document.getElementById('final-standings-tbody');
+        tbody.innerHTML = standings.map((p, i) => {
+            const isPlayer = p.id === 0;
+            const badge = i < 3 ? rankBadges[i] : `<span class="text-white/30">${i + 1}</span>`;
+            return `
+                <tr class="${isPlayer ? 'player-row' : ''} border-b border-white/[0.03]">
+                    <td class="py-2.5 px-2 text-center">${badge}</td>
+                    <td class="py-2.5 px-2">
+                        <div class="flex items-center gap-2">
+                            <span>${p.emoji}</span>
+                            <span class="${isPlayer ? 'text-amber-400 font-bold' : 'text-white/70'}">${p.name}</span>
+                        </div>
+                    </td>
+                    <td class="py-2.5 px-2 text-center text-emerald-400/80">${p.stats.wins}</td>
+                    <td class="py-2.5 px-2 text-center text-rose-400/80">${p.stats.losses}</td>
+                    <td class="py-2.5 px-2 text-center font-display font-bold">${p.stats.points}</td>
+                </tr>
+            `;
+        }).join('');
+
+        // Player season stats
+        const totalMoves = player.moveStats.rock + player.moveStats.paper + player.moveStats.scissors;
+        const favMove = Object.entries(player.moveStats).sort((a, b) => b[1] - a[1])[0];
+        const winRate = player.stats.played > 0 ? Math.round((player.stats.wins / player.stats.played) * 100) : 0;
+
+        document.getElementById('season-stats').innerHTML = `
+            <div class="text-center">
+                <p class="text-2xl font-display font-bold text-emerald-400">${winRate}%</p>
+                <p class="text-white/30 text-xs mt-1">Win Rate</p>
+            </div>
+            <div class="text-center">
+                <p class="text-2xl font-display font-bold text-white">${player.stats.wins}W - ${player.stats.losses}L</p>
+                <p class="text-white/30 text-xs mt-1">Record</p>
+            </div>
+            <div class="text-center">
+                <p class="text-2xl font-display font-bold text-cyan-400">${MOVE_EMOJIS[favMove[0]]}</p>
+                <p class="text-white/30 text-xs mt-1">Fav Move (${favMove[1]}×)</p>
+            </div>
+        `;
+
+        // Confetti if champion!
+        if (playerRank === 1) {
+            setTimeout(createConfetti, 300);
+        }
+    }
+
+    // ============================
+    //  CONFETTI
+    // ============================
+    function createConfetti() {
+        const container = document.getElementById('confetti-container');
+        container.innerHTML = '';
+        const colors = ['#fbbf24', '#f87171', '#34d399', '#60a5fa', '#a855f7', '#f472b6', '#fb923c'];
+
+        for (let i = 0; i < 80; i++) {
+            const piece = document.createElement('div');
+            piece.className = 'confetti-piece';
+            const size = Math.random() * 8 + 6;
+            piece.style.width = size + 'px';
+            piece.style.height = size + 'px';
+            piece.style.left = Math.random() * 100 + '%';
+            piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+            piece.style.setProperty('--fall-dur', (Math.random() * 2 + 2) + 's');
+            piece.style.setProperty('--fall-delay', (Math.random() * 2) + 's');
+            piece.style.setProperty('--rot', (Math.random() * 1080 - 360) + 'deg');
+            container.appendChild(piece);
+        }
+
+        // Clean up after animation
+        setTimeout(() => { container.innerHTML = ''; }, 5000);
+    }
+
+    // ============================
+    //  GAME INIT & RESTART
+    // ============================
+    function initGame() {
+        game.players = PLAYER_DEFS.map(p => ({
+            ...p,
+            stats: { wins: 0, losses: 0, points: 0, played: 0 },
+            moveStats: { rock: 0, paper: 0, scissors: 0 },
+        }));
+        game.schedule = generateSchedule(8);
+        game.currentMatchday = 0;
+        game.matchdayPlayed = false;
+        game.matchdayResults = [];
+        game.match = null;
+    }
+
+    function startGame() {
+        initGame();
+        showScreen('standings-screen');
+        renderStandings();
+        renderFixtures();
+    }
+
+    function restartGame() {
+        document.getElementById('confetti-container').innerHTML = '';
+        showScreen('title-screen');
+    }
+
+    // ============================
+    //  ENTRY POINT
+    // ============================
+    document.addEventListener('DOMContentLoaded', () => {
+        showScreen('title-screen');
+    });
+    </script>
+</body>
+</html>
